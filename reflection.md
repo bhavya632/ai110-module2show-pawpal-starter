@@ -2,6 +2,7 @@
 
 ## 1. System Design
 
+- classes = owner info (name, age, occupation), pet info (name, breed, age, gender), tasks (edit task, create task, delete task, duration of task, priority of task), daily schedule (view schedule, edit schedule, delete schedule)
 **a. Initial design**
 
 - Briefly describe your initial UML design.
