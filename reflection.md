@@ -6,12 +6,14 @@
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
-- classes = owner info (name, age, occupation), pet info (name, breed, age, gender), tasks (edit task, create task, delete task, duration of task, priority of task), daily schedule (view schedule, edit schedule, delete schedule)
+Classes = owner info (name, age, occupation), pet info (name, breed, age, gender), tasks (edit task, create task, delete task, duration of task, priority of task), daily schedule (view schedule, edit schedule, delete schedule)
 
 **b. Design changes**
 
 - Did your design change during implementation?
+Yes, a little
 - If yes, describe at least one change and why you made it.
+It added a lot of things I missed like a connection between the owner and pet.
 
 ---
 
@@ -21,11 +23,13 @@
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
+My scheduler takes more time (O(n^2)) but its easier to understand and is very human readable.
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+The tradeoff is time for more readable and easy to understand code. The tradeoff is reasonable i think because nothing else in the application takes a lot of time.
 
 ---
 
