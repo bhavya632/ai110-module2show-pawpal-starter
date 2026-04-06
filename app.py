@@ -41,7 +41,12 @@ if pet_submitted:
 
 if st.session_state.owner.pets:
     st.write("Your pets:")
-    st.table([{"name": p.name, "breed": p.breed, "age": p.age, "gender": p.gender} for p in st.session_state.owner.pets])
+    st.dataframe(
+        [{"Name": p.name, "Breed": p.breed, "Age": p.age, "Gender": p.gender}
+         for p in st.session_state.owner.pets],
+        use_container_width=True,
+        hide_index=True,
+    )
 
 if "pet" not in st.session_state:
     st.info("Add a pet above before scheduling tasks.")
@@ -95,7 +100,19 @@ if st.button("Add task"):
 
 if st.session_state.tasks:
     st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+    st.dataframe(
+        st.session_state.tasks,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "title": st.column_config.TextColumn("Task"),
+            "duration_minutes": st.column_config.NumberColumn("Duration (min)"),
+            "priority": st.column_config.TextColumn("Priority"),
+            "start_time": st.column_config.TextColumn("Start Time"),
+            "required": st.column_config.TextColumn("Required"),
+            "pet": st.column_config.TextColumn("Pet"),
+        },
+    )
 else:
     st.info("No tasks yet. Add one above.")
 
@@ -119,19 +136,23 @@ if st.button("Apply filter"):
     if not filtered:
         st.info("No tasks match the selected filters.")
     else:
-        st.write(f"{len(filtered)} task(s) found:")
-        st.table([
-            {
-                "title": t.title,
-                "pet": t.pet.name,
-                "priority": t.priority.value,
-                "duration_minutes": t.duration,
-                "start_time": t.start_time.strftime("%I:%M %p") if t.start_time else "—",
-                "required": "Yes" if t.required else "No",
-                "completed": "Yes" if t.completed else "No",
-            }
-            for t in filtered
-        ])
+        st.success(f"{len(filtered)} task(s) found.")
+        st.dataframe(
+            [
+                {
+                    "Task": t.title,
+                    "Pet": t.pet.name,
+                    "Priority": t.priority.value.capitalize(),
+                    "Duration (min)": t.duration,
+                    "Start Time": t.start_time.strftime("%I:%M %p") if t.start_time else "—",
+                    "Required": "Yes" if t.required else "No",
+                    "Done": "Yes" if t.completed else "No",
+                }
+                for t in filtered
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 st.divider()
 
@@ -167,30 +188,72 @@ if st.button("Generate schedule"):
         if not fitted:
             st.warning("No tasks fit within your available time.")
         else:
-            st.markdown(f"### Today's Schedule ({schedule.day})")
+            # --- Conflict detection -------------------------------------------
+            # Build a temporary schedule from only the fitted tasks so that
+            # detect_conflicts() runs on exactly what will be shown to the owner.
+            fitted_schedule = DailySchedule(schedule.day)
+            for t in fitted:
+                fitted_schedule.add_task(t)
 
-            # Sort fitted tasks by start_time (None times go last)
-            fitted.sort(key=lambda t: (t.start_time is None, t.start_time))
+            # Sort chronologically using the Scheduler's sort_by_time() method.
+            fitted_schedule.sort_by_time()
 
-            # Group by pet
-            by_pet: dict[str, list] = {}
-            for task in fitted:
-                by_pet.setdefault(task.pet.name, []).append(task)
-
-            for pet_name, pet_tasks in by_pet.items():
-                st.markdown(f"**{pet_name}**")
-                for task in pet_tasks:
-                    label = " *(required)*" if task.required else ""
-                    time_str = f" @ {task.start_time.strftime('%I:%M %p')}" if task.start_time else ""
-                    st.markdown(
-                        f"- **[{task.priority.value.upper()}]** {task.title} — {task.duration} min{time_str}{label}"
+            conflicts = fitted_schedule.detect_conflicts()
+            if conflicts:
+                st.error(
+                    "**Scheduling conflicts detected** — two or more tasks overlap. "
+                    "Adjust their start times before your day begins."
+                )
+                for msg in conflicts:
+                    # Extract the time portion for the suggestion line.
+                    # Message format: "CONFLICT: 'A' ... at HH:MM AM/PM."
+                    at_idx = msg.rfind(" at ")
+                    conflict_time = msg[at_idx + 4:].rstrip(".") if at_idx != -1 else "that time"
+                    st.warning(
+                        f"{msg}\n\n"
+                        f"**Fix:** Open the task list above and change one of these tasks "
+                        f"to a different start time so nothing overlaps at {conflict_time}."
                     )
+            else:
+                st.success("No conflicts — your schedule is clear!")
 
-            scheduled_minutes = sum(t.duration for t in fitted)
+            # --- Schedule table ----------------------------------------------
+            st.markdown(f"### Today's Schedule — {fitted_schedule.day.strftime('%A, %B %d')}")
+
+            rows = []
+            for task in fitted_schedule.tasks:
+                rows.append({
+                    "Task": task.title,
+                    "Pet": task.pet.name,
+                    "Priority": task.priority.value.capitalize(),
+                    "Duration (min)": task.duration,
+                    "Start Time": task.start_time.strftime("%I:%M %p") if task.start_time else "—",
+                    "Required": "Yes" if task.required else "No",
+                })
+
+            st.dataframe(
+                rows,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Task": st.column_config.TextColumn("Task", width="medium"),
+                    "Pet": st.column_config.TextColumn("Pet"),
+                    "Priority": st.column_config.TextColumn("Priority"),
+                    "Duration (min)": st.column_config.NumberColumn("Duration (min)"),
+                    "Start Time": st.column_config.TextColumn("Start Time"),
+                    "Required": st.column_config.TextColumn("Required"),
+                },
+            )
+
+            # --- Summary row -------------------------------------------------
+            scheduled_minutes = sum(t.duration for t in fitted_schedule.tasks)
             skipped = [t for t in incomplete_tasks if t not in fitted]
-            st.caption(f"Scheduled: {scheduled_minutes} min | Skipped: {len(skipped)} task(s)")
+            st.caption(
+                f"Scheduled: {scheduled_minutes} min across {len(fitted_schedule.tasks)} task(s) "
+                f"| Skipped: {len(skipped)} task(s)"
+            )
 
             if skipped:
-                with st.expander("Skipped tasks"):
+                with st.expander("Skipped tasks (did not fit in your time budget)"):
                     for t in skipped:
-                        st.markdown(f"- {t.title} ({t.duration} min, {t.priority.value})")
+                        st.markdown(f"- **{t.title}** — {t.duration} min, {t.priority.value} priority")
