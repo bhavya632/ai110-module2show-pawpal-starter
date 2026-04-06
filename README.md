@@ -64,4 +64,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## 📸 Demo
+<a href="assets/demo.png" target="_blank"><img src='assets/demo.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>.
+
 ===
